@@ -75,5 +75,8 @@ echo "Installing standalone Heroku CLI client."
 echo "Installing the heroku-config plugin for pulling config variables locally to be used as ENV variables ..."
   successfully heroku plugins:install git://github.com/ddollar/heroku-config.git
 
+echo "Installing grep, used for weather in tmux-powerline ..."
+  successfully brew install https://raw.github.com/Homebrew/homebrew-dupes/master/grep.rb
+
 echo "Your shell will now restart in order for changes to apply."
   exec $SHELL -l
