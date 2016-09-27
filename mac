@@ -1,100 +1,162 @@
-#!/usr/bin/env zsh
+#!/bin/sh
 
-successfully() {
-  $* || (echo "failed" 1>&2 && exit 1)
+# Welcome to the thoughtbot laptop script!
+# Be prepared to turn your laptop (or desktop, no haters here)
+# into an awesome development machine.
+
+fancy_echo() {
+  local fmt="$1"; shift
+
+  # shellcheck disable=SC2059
+  printf "\n$fmt\n" "$@"
 }
 
-echo "Checking for SSH key, generating one if it doesn't exist ..."
-  [[ -f ~/.ssh/id_rsa.pub ]] || ssh-keygen -t rsa
+append_to_zshrc() {
+  local text="$1" zshrc
+  local skip_new_line="${2:-0}"
 
-echo "Copying public key to clipboard. Paste it into your Github account ..."
-  [[ -f ~/.ssh/id_rsa.pub ]] && cat ~/.ssh/id_rsa.pub | pbcopy
-  successfully open https://github.com/account/ssh
+  if [ -w "$HOME/.zshrc.local" ]; then
+    zshrc="$HOME/.zshrc.local"
+  else
+    zshrc="$HOME/.zshrc"
+  fi
 
-echo "Fixing permissions ..."
-  successfully sudo mkdir -p /usr/local
-  successfully sudo chown -R `whoami` /usr/local
+  if ! grep -Fqs "$text" "$zshrc"; then
+    if [ "$skip_new_line" -eq 1 ]; then
+      printf "%s\n" "$text" >> "$zshrc"
+    else
+      printf "\n%s\n" "$text" >> "$zshrc"
+    fi
+  fi
+}
 
-echo "Installing Homebrew, a good OS X package manager ..."
-  successfully ruby <(curl -fsS https://raw.github.com/mxcl/homebrew/go)
-  successfully brew update
+# shellcheck disable=SC2154
+trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 
-echo "Putting Homebrew location earlier in PATH ..."
-  successfully echo "
-# recommended by brew doctor
-export PATH='/usr/local/bin:$PATH'" >> ~/.zshenv
-  successfully source ~/.zshenv
+set -e
 
-echo "Installing GNU Compiler Collection and dependencies ..."
-  successfully brew tap homebrew/dupes
-  successfully brew install autoconf automake apple-gcc42
+if [ ! -d "$HOME/.bin/" ]; then
+  mkdir "$HOME/.bin"
+fi
 
-echo "Installing system libraries recommended for Ruby ..."
-  successfully brew install gdbm libffi libksba libyaml
+if [ ! -f "$HOME/.zshrc" ]; then
+  touch "$HOME/.zshrc"
+fi
 
-echo "Installing Postgres, a good open source relational database ..."
-  successfully brew install postgres --no-python
-  successfully initdb /usr/local/var/postgres -E utf8
+# shellcheck disable=SC2016
+append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
 
-echo "Installing Redis, a good key-value database ..."
-  successfully brew install redis
+HOMEBREW_PREFIX="/usr/local"
 
-echo "Installing The Silver Searcher (better than ack or grep) for searching the contents of files ..."
-  successfully brew install the_silver_searcher
+if [ -d "$HOMEBREW_PREFIX" ]; then
+  if ! [ -r "$HOMEBREW_PREFIX" ]; then
+    sudo chown -R "$LOGNAME:admin" /usr/local
+  fi
+else
+  sudo mkdir "$HOMEBREW_PREFIX"
+  sudo chflags norestricted "$HOMEBREW_PREFIX"
+  sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
+fi
 
-echo "Installing ctags, for indexing files for vim tab completion of methods, classes, variables ..."
-  successfully brew install ctags
+case "$SHELL" in
+  */zsh) : ;;
+  *)
+    fancy_echo "Changing your shell to zsh ..."
+      chsh -s "$(which zsh)"
+    ;;
+esac
 
-echo "Installing tmux, for saving project state and switching between projects ..."
-  successfully brew install tmux
+gem_install_or_update() {
+  if gem list "$1" --installed > /dev/null; then
+    gem update "$@"
+  else
+    gem install "$@"
+    rbenv rehash
+  fi
+}
 
-echo "Installing reattach-to-user-namespace, for copy-paste and RubyMotion compatibility with tmux ..."
-  successfully brew install reattach-to-user-namespace
+if ! command -v brew >/dev/null; then
+  fancy_echo "Installing Homebrew ..."
+    curl -fsS \
+      'https://raw.githubusercontent.com/Homebrew/install/master/install' | ruby
 
-echo "Installing ImageMagick, for cropping and re-sizing images ..."
-  successfully brew install imagemagick
+    append_to_zshrc '# recommended by brew doctor'
 
-echo "Installing QT, used by Capybara Webkit for headless Javascript integration testing ..."
-  successfully brew install qt
+    # shellcheck disable=SC2016
+    append_to_zshrc 'export PATH="/usr/local/bin:$PATH"' 1
 
-echo "Installing watch, used to execute a program periodically and show the output ..."
-  successfully brew install watch
+    export PATH="/usr/local/bin:$PATH"
+fi
 
-echo "Installing rbenv for changing Ruby versions ..."
-  successfully brew install rbenv
-  successfully echo 'eval "$(rbenv init -)"' >> ~/.zlogin
-  successfully source ~/.zlogin
+if brew list | grep -Fq brew-cask; then
+  fancy_echo "Uninstalling old Homebrew-Cask ..."
+  brew uninstall --force brew-cask
+fi
 
-echo "Installing rbenv-gem-rehash so the shell automatically picks up binaries after installing gems with binaries..."
-  successfully brew install rbenv-gem-rehash
+fancy_echo "Updating Homebrew formulae ..."
+brew update
+brew bundle --file=- <<EOF
+tap "thoughtbot/formulae"
+tap "homebrew/services"
 
-echo "Installing ruby-build for installing Rubies ..."
-  successfully brew install ruby-build
+# Unix
+brew "ctags"
+brew "git"
+brew "openssl"
+brew "rcm"
+brew "reattach-to-user-namespace"
+brew "the_silver_searcher"
+brew "tmux"
+brew "vim"
+brew "zsh"
 
-echo "Installing Ruby 1.9.3-p392 ..."
-  CC=gcc-4.2 successfully rbenv install 1.9.3-p392
+# Heroku
+brew "heroku-toolbelt"
+brew "parity"
 
-echo "Setting Ruby 1.9.3-p392 as global default Ruby ..."
-  successfully rbenv global 1.9.3-p392
-  successfully rbenv shell 1.9.3-p392
+# GitHub
+brew "hub"
 
-echo "Update to latest Rubygems version ..."
-  successfully gem update --system
+# Image manipulation
+brew "imagemagick"
 
-echo "Installing critical Ruby gems for Rails development ..."
-  successfully gem install bundler foreman pg rails thin --no-document
+# Testing
+brew "qt"
 
-echo "Installing GitHub CLI client ..."
-  successfully gem install hub --no-document
+# Programming languages
+brew "libyaml" # should come after openssl
+brew "node"
+brew "rbenv"
+brew "ruby-build"
 
-echo "Installing Heroku CLI client ..."
-  successfully brew install heroku-toolbelt
+# Databases
+brew "postgres", restart_service: true
+brew "redis", restart_service: true
+EOF
 
-echo "Installing the heroku-config plugin for pulling config variables locally to be used as ENV variables ..."
-  successfully heroku plugins:install git://github.com/ddollar/heroku-config.git
+fancy_echo "Configuring Ruby ..."
+find_latest_ruby() {
+  rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//'
+}
 
-echo "Installing grep, used for weather in tmux-powerline ..."
-  successfully brew install https://raw.github.com/Homebrew/homebrew-dupes/master/grep.rb
+ruby_version="$(find_latest_ruby)"
+# shellcheck disable=SC2016
+append_to_zshrc 'eval "$(rbenv init - --no-rehash)"' 1
+eval "$(rbenv init -)"
 
-echo "Your shell will now restart in order for changes to apply."
-  exec $SHELL -l
+if ! rbenv versions | grep -Fq "$ruby_version"; then
+  RUBY_CONFIGURE_OPTS=--with-openssl-dir=/usr/local/opt/openssl rbenv install -s "$ruby_version"
+fi
+
+rbenv global "$ruby_version"
+rbenv shell "$ruby_version"
+gem update --system
+gem_install_or_update 'bundler'
+number_of_cores=$(sysctl -n hw.ncpu)
+bundle config --global jobs $((number_of_cores - 1))
+
+if [ -f "$HOME/.laptop.local" ]; then
+  fancy_echo "Running your customizations from ~/.laptop.local ..."
+  # shellcheck disable=SC1090
+  . "$HOME/.laptop.local"
+fi

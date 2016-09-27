@@ -1,68 +1,220 @@
 Laptop
 ======
 
-Laptop is a script to set up a Mac OS X laptop for Rails development.
+Laptop is a script to set up an OS X laptop for web development.
+
+It can be run multiple times on the same machine safely.
+It installs, upgrades, or skips packages
+based on what is already installed on the machine.
 
 Requirements
 ------------
 
-1) Install a C compiler.
+We support:
 
-Use [OS X GCC Installer](https://github.com/kennethreitz/osx-gcc-installer/) for
-Snow Leopard (OS X 10.6).
+* OS X Mavericks (10.9)
+* OS X Yosemite (10.10)
+* OS X El Capitan (10.11)
 
-Use [Command Line Tools for XCode](https://developer.apple.com/downloads/index.action)
-for Lion (OS X 10.7) or Mountain Lion (OS X 10.8).
-
-2) Set zsh as your login shell.
-
-    chsh -s /bin/zsh
+Older versions may work but aren't regularly tested. Bug reports for older
+versions are welcome.
 
 Install
 -------
 
-Run the script:
+Download, review, then execute the script:
 
-    zsh <(curl -s https://raw.github.com/thoughtbot/laptop/master/mac)
+```sh
+curl --remote-name https://raw.githubusercontent.com/thoughtbot/laptop/master/mac
+less mac
+sh mac 2>&1 | tee ~/laptop.log
+```
+
+Optionally, [install thoughtbot/dotfiles][dotfiles].
+
+[dotfiles]: https://github.com/thoughtbot/dotfiles#install
+
+Debugging
+---------
+
+Your last Laptop run will be saved to `~/laptop.log`.
+Read through it to see if you can debug the issue yourself.
+If not, copy the lines where the script failed into a
+[new GitHub Issue](https://github.com/thoughtbot/laptop/issues/new) for us.
+Or, attach the whole log file as an attachment.
 
 What it sets up
 ---------------
 
-* Bundler gem for managing Ruby libraries
-* Exuberant Ctags for indexing files for vim tab completion
-* Foreman gem for serving Rails apps locally
-* Heroku Config plugin for local `ENV` variables
-* Heroku Toolbelt for interacting with the Heroku API
-* Hub gem for interacting with the GitHub API
-* Homebrew for managing operating system libraries
-* ImageMagick for cropping and resizing images
-* Postgres for storing relational data
-* Postgres gem for talking to Postgres from Ruby
-* Qt for headless JavaScript testing via Capybara Webkit
-* Rails gem for writing web applications
-* Rbenv for managing versions of the Ruby programming language
-* Redis for storing key-value data
-* Ruby Build for installing Rubies
-* Ruby stable for writing general-purpose code
-* SSH public key for authenticating with Github and Heroku
-* The Silver Searcher for finding things in files
-* Tmux for saving project state and switching between projects
-* Watch for periodically executing a program and displaying the output
+Mac OS X tools:
+
+* [Homebrew] for managing operating system libraries.
+
+[Homebrew]: http://brew.sh/
+
+Unix tools:
+
+* [Exuberant Ctags] for indexing files for vim tab completion
+* [Git] for version control
+* [OpenSSL] for Transport Layer Security (TLS)
+* [RCM] for managing company and personal dotfiles
+* [The Silver Searcher] for finding things in files
+* [Tmux] for saving project state and switching between projects
+* [Zsh] as your shell
+
+[Exuberant Ctags]: http://ctags.sourceforge.net/
+[Git]: https://git-scm.com/
+[OpenSSL]: https://www.openssl.org/
+[RCM]: https://github.com/thoughtbot/rcm
+[The Silver Searcher]: https://github.com/ggreer/the_silver_searcher
+[Tmux]: http://tmux.github.io/
+[Zsh]: http://www.zsh.org/
+
+Heroku tools:
+
+* [Heroku Toolbelt] and [Parity] for interacting with the Heroku API
+
+[Heroku Toolbelt]: https://toolbelt.heroku.com/
+[Parity]: https://github.com/thoughtbot/parity
+
+GitHub tools:
+
+* [Hub] for interacting with the GitHub API
+
+[Hub]: http://hub.github.com/
+
+Image tools:
+
+* [ImageMagick] for cropping and resizing images
+
+Testing tools:
+
+* [Qt] for headless JavaScript testing via Capybara Webkit
+
+[Qt]: http://qt-project.org/
+
+Programming languages and configuration:
+
+* [Bundler] for managing Ruby libraries
+* [Node.js] and [NPM], for running apps and installing JavaScript packages
+* [Rbenv] for managing versions of Ruby
+* [Ruby Build] for installing Rubies
+* [Ruby] stable for writing general-purpose code
+
+[Bundler]: http://bundler.io/
+[ImageMagick]: http://www.imagemagick.org/
+[Node.js]: http://nodejs.org/
+[NPM]: https://www.npmjs.org/
+[Rbenv]: https://github.com/sstephenson/rbenv
+[Ruby Build]: https://github.com/sstephenson/ruby-build
+[Ruby]: https://www.ruby-lang.org/en/
+
+Databases:
+
+* [Postgres] for storing relational data
+* [Redis] for storing key-value data
+
+[Postgres]: http://www.postgresql.org/
+[Redis]: http://redis.io/
 
 It should take less than 15 minutes to install (depends on your machine).
 
-Credits
--------
+Customize in `~/.laptop.local`
+------------------------------
 
-![thoughtbot](http://thoughtbot.com/assets/tm/logo.png)
+Your `~/.laptop.local` is run at the end of the Laptop script.
+Put your customizations there.
+For example:
 
-Laptop is maintained and funded by [thoughtbot, inc](http://thoughtbot.com/community).
-The names and logos for thoughtbot are trademarks of thoughtbot, inc.
+```sh
+#!/bin/sh
 
-Thank you, [contributors](/thoughtbot/laptop/graphs/contributors)!
+brew bundle --file=- <<EOF
+brew "Caskroom/cask/dockertoolbox"
+brew "go"
+brew "ngrok"
+brew "watch"
+EOF
+
+default_docker_machine() {
+  docker-machine ls | grep -Fq "default"
+}
+
+if ! default_docker_machine; then
+  docker-machine create --driver virtualbox default
+fi
+
+default_docker_machine_running() {
+  default_docker_machine | grep -Fq "Running"
+}
+
+if ! default_docker_machine_running; then
+  docker-machine start default
+fi
+
+fancy_echo "Cleaning up old Homebrew formulae ..."
+brew cleanup
+brew cask cleanup
+
+if [ -r "$HOME/.rcrc" ]; then
+  fancy_echo "Updating dotfiles ..."
+  rcup
+fi
+```
+
+Write your customizations such that they can be run safely more than once.
+See the `mac` script for examples.
+
+Laptop functions such as `fancy_echo` and
+`gem_install_or_update`
+can be used in your `~/.laptop.local`.
+
+See the [wiki](https://github.com/thoughtbot/laptop/wiki)
+for more customization examples.
+
+Contributing
+------------
+
+Edit the `mac` file.
+Document in the `README.md` file.
+Follow shell style guidelines by using [ShellCheck] and [Syntastic].
+
+```sh
+brew install shellcheck
+```
+
+[ShellCheck]: http://www.shellcheck.net/about.html
+[Syntastic]: https://github.com/scrooloose/syntastic
+
+Thank you, [contributors]!
+
+[contributors]: https://github.com/thoughtbot/laptop/graphs/contributors
+
+By participating in this project,
+you agree to abide by the thoughtbot [code of conduct].
+
+[code of conduct]: https://thoughtbot.com/open-source-code-of-conduct
 
 License
 -------
 
-Laptop is © 2011-2013 thoughtbot, inc. It is free software, and may be
-redistributed under the terms specified in the LICENSE file.
+Laptop is © 2011-2016 thoughtbot, inc.
+It is free software,
+and may be redistributed under the terms specified in the [LICENSE] file.
+
+[LICENSE]: LICENSE
+
+About thoughtbot
+----------------
+
+![thoughtbot](https://thoughtbot.com/logo.png)
+
+Laptop is maintained and funded by thoughtbot, inc.
+The names and logos for thoughtbot are trademarks of thoughtbot, inc.
+
+We are passionate about open source software.
+See [our other projects][community].
+We are [available for hire][hire].
+
+[community]: https://thoughtbot.com/community?utm_source=github
+[hire]: https://thoughtbot.com?utm_source=github
