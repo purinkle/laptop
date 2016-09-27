@@ -87,12 +87,6 @@ Image tools:
 
 * [ImageMagick] for cropping and resizing images
 
-Testing tools:
-
-* [Qt] for headless JavaScript testing via Capybara Webkit
-
-[Qt]: http://qt-project.org/
-
 Programming languages and configuration:
 
 * [Bundler] for managing Ruby libraries

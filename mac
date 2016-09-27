@@ -120,9 +120,6 @@ brew "hub"
 # Image manipulation
 brew "imagemagick"
 
-# Testing
-brew "qt"
-
 # Programming languages
 brew "libyaml" # should come after openssl
 brew "node"
